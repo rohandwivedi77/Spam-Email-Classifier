@@ -43,7 +43,7 @@ const GmailScanner = () => {
 
   const connectGmail = () => {
     // Use browser navigation so the Google OAuth redirect can complete.
-    window.location.href = "https://spam-email-classifier-fekr.onrender.com/auth/status";
+    window.location.href = "https://spam-email-classifier-fekr.onrender.com/auth/google";
   };
 
   const disconnectGmail = async () => {

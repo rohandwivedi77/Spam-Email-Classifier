@@ -265,7 +265,7 @@ def auth_google():
         value=session_id,
         httponly=True,
         secure=IS_PRODUCTION,
-        samesite="lax",
+        samesite="none" if IS_PRODUCTION else "lax",
         max_age=3600,
         path="/",
     )

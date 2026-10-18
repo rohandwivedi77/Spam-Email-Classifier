@@ -17,7 +17,12 @@ from googleapiclient.discovery import build
 # ================= CONFIGURATION =================
 
 BASE_DIR = Path(__file__).resolve().parent
-CLIENT_FILE = BASE_DIR / "web_credentials.json"
+CLIENT_FILE = Path(
+    os.getenv(
+        "GOOGLE_CLIENT_FILE",
+        str(BASE_DIR / "web_credentials.json")
+    )
+)
 
 SCOPES = [
     "https://www.googleapis.com/auth/gmail.readonly"

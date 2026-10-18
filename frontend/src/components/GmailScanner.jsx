@@ -23,7 +23,7 @@ const GmailScanner = () => {
     const checkGmailConnection = async () => {
       try {
         const response = await axios.get(
-          "http://127.0.0.1:8000/auth/status",
+          "https://spam-email-classifier-fekr.onrender.com/auth/status",
           { withCredentials: true }
         );
 
@@ -43,7 +43,7 @@ const GmailScanner = () => {
 
   const connectGmail = () => {
     // Use browser navigation so the Google OAuth redirect can complete.
-    window.location.href = "http://127.0.0.1:8000/auth/google";
+    window.location.href = "https://spam-email-classifier-fekr.onrender.com/auth/status";
   };
 
   const disconnectGmail = async () => {
@@ -52,7 +52,7 @@ const GmailScanner = () => {
 
     try {
       await axios.post(
-        "http://127.0.0.1:8000/auth/disconnect",
+        "https://spam-email-classifier-fekr.onrender.com/auth/disconnect",
         {},
         { withCredentials: true }
       );
@@ -82,7 +82,7 @@ const GmailScanner = () => {
 
     try {
       const response = await axios.get(
-        "http://127.0.0.1:8000/gmail/emails",
+        "https://spam-email-classifier-fekr.onrender.com/auth/callback",
         {
           params: {
             max_results: 5,
@@ -122,7 +122,7 @@ const GmailScanner = () => {
 
   try {
     const response = await axios.get(
-      "http://127.0.0.1:8000/gmail/emails",
+      "https://spam-email-classifier-fekr.onrender.com/gmail/emails",
       {
         params: {
           max_results: 5,

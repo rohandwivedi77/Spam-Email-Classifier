@@ -15,7 +15,7 @@ const handlePredict = async () => {
 
   try {
     const response = await axios.post(
-      "http://127.0.0.1:8000/predict",
+      "https://spam-email-classifier-fekr.onrender.com/predict",
       {
         message: text,
       }

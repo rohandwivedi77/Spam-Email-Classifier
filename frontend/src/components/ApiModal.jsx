@@ -8,17 +8,17 @@ export default function ApiModal({ isOpen, onClose }) {
   if (!isOpen) return null;
 
   const curlCode = `curl -X 'POST' \\
-  'http://localhost:8000/api/predict' \\
+  'https://spam-email-classifier-fekr.onrender.com/predict' \\
   -H 'accept: application/json' \\
   -H 'Content-Type: application/json' \\
   -d '{
-  "text": "WINNER! You have won a $1000 prize! Claim now."
+  "message": "WINNER! You have won a $1000 prize! Claim now."
 }'`;
 
   const pythonCode = `import requests
 
-url = "http://localhost:8000/api/predict"
-payload = {"text": "WINNER! You have won a $1000 prize! Claim now."}
+url = "https://spam-email-classifier-fekr.onrender.com/predict"
+payload = {"message": "WINNER! You have won a $1000 prize! Claim now."}
 
 response = requests.post(url, json=payload)
 print(response.json())

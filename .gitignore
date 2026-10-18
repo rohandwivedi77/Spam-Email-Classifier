@@ -1,0 +1,53 @@
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+venv/
+.venv/
+env/
+
+# Python environment variables and secrets
+.env
+.env.*
+!.env.example
+credentials.json
+token.json
+web_credentials.json
+client_secret*.json
+
+# Frontend dependencies and builds
+node_modules/
+frontend/dist/
+
+# Logs and temporary files
+*.log
+.DS_Store
+Thumbs.db
+.vscode/s
+
+# Local backups
+GmailScanner_old.jsx
+GmailScanner.backup.jsx
+
+# Jupyter
+.ipynb_checkpoints/
+
+.vscode/
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+env/
+node_modules/
+frontend/dist/
+.env
+.env.*
+!.env.example
+credentials.json
+token.json
+web_credentials.json
+client_secret*.json
+.ipynb_checkpoints/
+# Duplicate dataset
+Data/SMSSpamCollection - Copy

@@ -4,6 +4,11 @@ import pickle
 from pathlib import Path
 
 import nltk
+
+nltk.download("punkt")
+nltk.download("punkt_tab")
+nltk.download("stopwords")
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse

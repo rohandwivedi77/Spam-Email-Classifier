@@ -24,7 +24,7 @@ frontend/dist/
 *.log
 .DS_Store
 Thumbs.db
-.vscode/s
+.vscode/settings.json
 
 # Local backups
 GmailScanner_old.jsx

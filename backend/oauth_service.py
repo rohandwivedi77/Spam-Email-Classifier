@@ -4,7 +4,8 @@ import secrets
 from pathlib import Path
 
 # Local development only. Never enable this in production.
-os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
+if os.getenv("ENVIRONMENT", "development") == "development":
+    os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 
 from fastapi import HTTPException, Request
 from google.auth.transport.requests import Request as GoogleRequest
@@ -22,10 +23,16 @@ SCOPES = [
     "https://www.googleapis.com/auth/gmail.readonly"
 ]
 
-REDIRECT_URI = "http://127.0.0.1:8000/auth/callback"
+REDIRECT_URI = os.getenv(
+    "GOOGLE_REDIRECT_URI",
+    "http://127.0.0.1:8000/auth/callback"
+)
 
 # Change this if your React frontend uses another port.
-FRONTEND_URL = "http://127.0.0.1:5173"
+FRONTEND_URL = os.getenv(
+    "FRONTEND_URL",
+    "http://127.0.0.1:5173"
+)
 
 
 # ================= TEMPORARY STORAGE =================

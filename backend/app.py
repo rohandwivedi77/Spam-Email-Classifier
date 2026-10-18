@@ -1,20 +1,18 @@
-from fastapi.middleware.cors import CORSMiddleware
 
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from pathlib import Path
+import os
 import pickle
+from pathlib import Path
+
 import nltk
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, RedirectResponse
+from pydantic import BaseModel
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 from nltk.stem.porter import PorterStemmer
 
 from gmail_service import get_emails
-
-
-from fastapi import Request
-from fastapi.responses import RedirectResponse, JSONResponse
-
 from oauth_service import (
     start_google_login,
     complete_google_login,
@@ -23,7 +21,27 @@ from oauth_service import (
     user_credentials,
 )
 
-FRONTEND_URL = "http://127.0.0.1:5173"
+
+# ----------------------------------------------------
+# Configuration
+# ----------------------------------------------------
+
+FRONTEND_URL = os.getenv(
+    "FRONTEND_URL",
+    "http://127.0.0.1:5173"
+).rstrip("/")
+
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
+IS_PRODUCTION = ENVIRONMENT == "production"
+
+FRONTEND_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "FRONTEND_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173"
+    ).split(",")
+    if origin.strip()
+]
 
 
 # ----------------------------------------------------
@@ -32,21 +50,21 @@ FRONTEND_URL = "http://127.0.0.1:5173"
 
 app = FastAPI(
     title="Spam Email Classifier API",
-    description="Predict whether a message is Spam or Ham using Machine Learning.",
-    version="1.0.0"
+    description=(
+        "Predict whether a message is Spam or Ham "
+        "using Machine Learning."
+    ),
+    version="1.0.0",
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "https://YOUR_PROJECT.vercel.app"
-    ],
+    allow_origins=FRONTEND_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # ----------------------------------------------------
 # Load Model and Vectorizer
@@ -60,6 +78,7 @@ with open(BASE_DIR / "model.pkl", "rb") as file:
 with open(BASE_DIR / "vectorizer.pkl", "rb") as file:
     vectorizer = pickle.load(file)
 
+
 # ----------------------------------------------------
 # NLP Setup
 # ----------------------------------------------------
@@ -67,48 +86,42 @@ with open(BASE_DIR / "vectorizer.pkl", "rb") as file:
 ps = PorterStemmer()
 stop_words = set(stopwords.words("english"))
 
+
 # ----------------------------------------------------
-# Text Preprocessing Function
+# Text Preprocessing
 # ----------------------------------------------------
 
-def transform_text(text):
-
-    # Convert to lowercase
+def transform_text(text: str) -> str:
     text = text.lower()
+    tokens = word_tokenize(text)
 
-    # Tokenization
-    text = word_tokenize(text)
+    words = [
+        word for word in tokens
+        if word.isalnum()
+    ]
 
-    # Remove punctuation and special characters
-    words = []
+    filtered_words = [
+        word for word in words
+        if word not in stop_words
+    ]
 
-    for word in text:
-        if word.isalnum():
-            words.append(word)
-
-    # Remove stopwords
-    filtered_words = []
-
-    for word in words:
-        if word not in stop_words:
-            filtered_words.append(word)
-
-    # Stemming
-    stemmed_words = []
-
-    for word in filtered_words:
-        stemmed_words.append(ps.stem(word))
+    stemmed_words = [
+        ps.stem(word)
+        for word in filtered_words
+    ]
 
     return " ".join(stemmed_words)
 
-def classify_message(message):
 
+# ----------------------------------------------------
+# Spam Classification
+# ----------------------------------------------------
+
+def classify_message(message: str) -> dict:
     clean_message = transform_text(message)
-
     vector = vectorizer.transform([clean_message])
 
     prediction = model.predict(vector)[0]
-
     probability = model.predict_proba(vector).max()
 
     result = "Spam" if prediction == 1 else "Ham"
@@ -116,25 +129,24 @@ def classify_message(message):
     return {
         "processed_message": clean_message,
         "prediction": result,
-        "confidence": round(float(probability), 4)
+        "confidence": round(float(probability), 4),
     }
 
+
 # ----------------------------------------------------
-# Request Model
+# Request and Response Models
 # ----------------------------------------------------
 
 class Message(BaseModel):
     message: str
 
-# ----------------------------------------------------
-# Response Model
-# ----------------------------------------------------
 
 class PredictionResponse(BaseModel):
     original_message: str
     processed_message: str
     prediction: str
     confidence: float
+
 
 # ----------------------------------------------------
 # Home Route
@@ -146,31 +158,32 @@ def home():
         "message": "Spam Detection API is Running"
     }
 
+
 # ----------------------------------------------------
 # Prediction Route
 # ----------------------------------------------------
 
 @app.post("/predict", response_model=PredictionResponse)
 def predict(data: Message):
-
-    # Check empty input
     if not data.message.strip():
         raise HTTPException(
             status_code=400,
-            detail="Message cannot be empty."
+            detail="Message cannot be empty.",
         )
 
-    # Result
     result = classify_message(data.message)
 
     return PredictionResponse(
         original_message=data.message,
         processed_message=result["processed_message"],
         prediction=result["prediction"],
-        confidence=result["confidence"]
+        confidence=result["confidence"],
     )
 
 
+# ----------------------------------------------------
+# Gmail Emails Route
+# ----------------------------------------------------
 
 @app.get("/gmail/emails")
 def gmail_emails(
@@ -179,25 +192,22 @@ def gmail_emails(
     page_token: str | None = None,
     query: str | None = None,
 ):
-    session_id = request.cookies.get("verishield_session")
+    if not 1 <= max_results <= 100:
+        raise HTTPException(
+            status_code=400,
+            detail="max_results must be between 1 and 100.",
+        )
 
-    # Debugging
-    print("GMAIL COOKIE RECEIVED:", bool(session_id))
-    print(
-        "GMAIL SESSION EXISTS:",
-        session_id in user_credentials if session_id else False
-    )
+    session_id = request.cookies.get("verishield_session")
 
     if not session_id:
         raise HTTPException(
             status_code=401,
-            detail="Gmail session cookie missing. Please connect Google again."
+            detail="Gmail session cookie missing. Please connect Google again.",
         )
 
-    # Get authenticated user's Gmail service
     service = get_user_gmail_service(session_id)
 
-    # Fetch emails
     gmail_result = get_emails(
         max_results=max_results,
         page_token=page_token,
@@ -232,6 +242,9 @@ def gmail_emails(
     }
 
 
+# ----------------------------------------------------
+# Google OAuth Login
+# ----------------------------------------------------
 
 @app.get("/auth/google")
 def auth_google():
@@ -246,7 +259,7 @@ def auth_google():
         key="verishield_session",
         value=session_id,
         httponly=True,
-        secure=False,  # Local HTTP development only
+        secure=IS_PRODUCTION,
         samesite="lax",
         max_age=3600,
         path="/",
@@ -255,24 +268,21 @@ def auth_google():
     return response
 
 
+# ----------------------------------------------------
+# Google OAuth Callback
+# ----------------------------------------------------
 
 @app.get("/auth/callback")
 def auth_callback(request: Request):
     session_id = request.cookies.get("verishield_session")
 
     if not session_id:
-        return JSONResponse(
+        raise HTTPException(
             status_code=401,
-            content={
-                "detail": "OAuth session cookie missing. Start login again."
-            },
+            detail="OAuth session cookie missing. Start login again.",
         )
 
-    try:
-        complete_google_login(request, session_id)
-    except Exception as exc:
-        print("OAuth callback failed:", repr(exc))
-        raise
+    complete_google_login(request, session_id)
 
     return RedirectResponse(
         url=f"{FRONTEND_URL}/?gmail_connected=true",
@@ -280,20 +290,16 @@ def auth_callback(request: Request):
     )
 
 
+# ----------------------------------------------------
+# Gmail Connection Status
+# ----------------------------------------------------
 
 @app.get("/auth/status")
 def auth_status(request: Request):
     session_id = request.cookies.get("verishield_session")
 
-    print("Status endpoint - cookie received:", bool(session_id))
-
     if not session_id:
-        return {"connected": False, "reason": "session cookie missing"}
-
-    print(
-        "status endpoint - credentials found:",
-        session_id in user_credentials
-    )
+        return {"connected": False}
 
     try:
         service = get_user_gmail_service(session_id)
@@ -307,10 +313,19 @@ def auth_status(request: Request):
             "email": profile.get("emailAddress"),
         }
 
-    except Exception as exc:
-        print("auth status error:",repr(exc))
+    except HTTPException as exc:
+        if exc.status_code == 401:
+            return {"connected": False}
+
+        raise
+
+    except Exception:
         return {"connected": False}
 
+
+# ----------------------------------------------------
+# Disconnect Gmail
+# ----------------------------------------------------
 
 @app.post("/auth/disconnect")
 def auth_disconnect(request: Request):
@@ -326,6 +341,8 @@ def auth_disconnect(request: Request):
     response.delete_cookie(
         key="verishield_session",
         path="/",
+        secure=IS_PRODUCTION,
+        httponly=True,
         samesite="lax",
     )
 

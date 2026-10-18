@@ -4,7 +4,7 @@ import secrets
 from pathlib import Path
 
 # Local development only. Never enable this in production.
-if os.getenv("ENVIRONMENT", "development").lower() == "development":
+if os.getenv("ENVIRONMENT", "development") == "development":
     os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 
 from fastapi import HTTPException, Request

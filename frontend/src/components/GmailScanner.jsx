@@ -82,7 +82,7 @@ const GmailScanner = () => {
 
     try {
       const response = await axios.get(
-        "https://spam-email-classifier-fekr.onrender.com/auth/callback",
+        "https://spam-email-classifier-fekr.onrender.com/gmail/emails",
         {
           params: {
             max_results: 5,

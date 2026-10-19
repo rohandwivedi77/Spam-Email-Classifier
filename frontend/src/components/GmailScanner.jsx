@@ -1,6 +1,26 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 
+const API_BASE = "https://spam-email-classifier-fekr.onrender.com";
+const SESSION_STORAGE_KEY = "verishield_session_id";
+
+// The backend returns the session ID in the URL fragment after OAuth.
+// Fragments are not sent to the server in HTTP requests. Keep the ID in
+// sessionStorage (this browser tab only) and send it in X-Session-ID headers.
+const readSessionId = () => {
+  if (typeof window === "undefined") return "";
+  try {
+    return window.sessionStorage.getItem(SESSION_STORAGE_KEY) || "";
+  } catch {
+    return "";
+  }
+};
+
+const authRequestConfig = () => {
+  const sessionId = readSessionId();
+  return sessionId ? { headers: { "X-Session-ID": sessionId } } : { headers: {} };
+};
+
 const GmailScanner = () => {
   const [emails, setEmails] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -18,17 +38,36 @@ const GmailScanner = () => {
   const [connectionError, setConnectionError] = useState("");
   const [disconnecting, setDisconnecting] = useState(false);
 
-  // Check whether Gmail is already connected when this component loads.
+  // Capture the session ID returned after Google OAuth, remove it from the
+  // visible URL, then ask the backend whether Gmail is connected.
   useEffect(() => {
     const checkGmailConnection = async () => {
       try {
+        const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+        const returnedSessionId = hashParams.get("session_id");
+
+        if (returnedSessionId) {
+          window.sessionStorage.setItem(SESSION_STORAGE_KEY, returnedSessionId);
+          // Remove the sensitive fragment from the address bar/history entry.
+          window.history.replaceState(
+            null,
+            document.title,
+            `${window.location.pathname}${window.location.search}`
+          );
+        }
+
         const response = await axios.get(
-          "https://spam-email-classifier-fekr.onrender.com/auth/status",
-          { withCredentials: true }
+          `${API_BASE}/auth/status`,
+          authRequestConfig()
         );
 
         setGmailConnected(Boolean(response.data.connected));
         setGmailEmail(response.data.email || "");
+
+        if (!response.data.connected && readSessionId()) {
+          // Do not keep a stale session ID if the backend no longer recognizes it.
+          window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
+        }
       } catch (err) {
         console.error("Gmail status error:", err);
         setGmailConnected(false);
@@ -43,7 +82,7 @@ const GmailScanner = () => {
 
   const connectGmail = () => {
     // Use browser navigation so the Google OAuth redirect can complete.
-    window.location.href = "https://spam-email-classifier-fekr.onrender.com/auth/google";
+    window.location.href = `${API_BASE}/auth/google`;
   };
 
   const disconnectGmail = async () => {
@@ -52,11 +91,12 @@ const GmailScanner = () => {
 
     try {
       await axios.post(
-        "https://spam-email-classifier-fekr.onrender.com/auth/disconnect",
+        `${API_BASE}/auth/disconnect`,
         {},
-        { withCredentials: true }
+        authRequestConfig()
       );
 
+      window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
       setGmailConnected(false);
       setGmailEmail("");
       setEmails([]);
@@ -82,13 +122,13 @@ const GmailScanner = () => {
 
     try {
       const response = await axios.get(
-        "https://spam-email-classifier-fekr.onrender.com/gmail/emails",
+        `${API_BASE}/gmail/emails`,
         {
           params: {
             max_results: 5,
             query: searchQuery.trim() || undefined,
           },
-          withCredentials: true,
+          ...authRequestConfig(),
         }
       );
 
@@ -100,8 +140,11 @@ const GmailScanner = () => {
     } catch (err) {
       console.error("Gmail error:", err);
 
+      const detail = err.response?.data?.detail;
       setError(
-        "Failed to fetch Gmail emails. Make sure the FastAPI backend is running."
+        typeof detail === "string"
+          ? detail
+          : "Could not fetch Gmail emails. Reconnect Gmail and try again."
       );
     } finally {
       setLoading(false);
@@ -122,13 +165,13 @@ const GmailScanner = () => {
 
   try {
     const response = await axios.get(
-      "https://spam-email-classifier-fekr.onrender.com/gmail/emails",
+      `${API_BASE}/gmail/emails`,
       {
         params: {
           max_results: 5,
           page_token: nextPageToken,
         },
-        withCredentials: true,
+        ...authRequestConfig(),
       }
     );
 
@@ -143,7 +186,8 @@ const GmailScanner = () => {
 
   } catch (err) {
     console.error("Load more error:", err);
-    setError("Failed to load more emails.");
+    const detail = err.response?.data?.detail;
+    setError(typeof detail === "string" ? detail : "Failed to load more emails.");
   } finally {
     setLoadingMore(false);
   }
